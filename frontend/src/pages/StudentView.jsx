@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import { supabase } from '../lib/supabase';
 import confetti from 'canvas-confetti';
 import { Volume2, Smile, Frown, Check, Send } from 'lucide-react';
-
-const API_URL = '/api';
 
 function StudentView() {
   const { id } = useParams();
@@ -21,17 +19,22 @@ function StudentView() {
 
   const fetchExercise = async () => {
     try {
-      const res = await axios.get(`${API_URL}/exercises/${id}`);
-      if (res.data && res.data.alternativas) {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+
+      if (data && data.alternativas) {
         // Shuffle alternatives for fun
-        const ex = res.data;
+        const ex = data;
         ex.alternativas = [...ex.alternativas].sort(() => Math.random() - 0.5);
         setExercise(ex);
-      } else {
-        console.warn('API returned invalid exercise data:', res.data);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching exercise:', err);
     }
   };
 
@@ -44,8 +47,8 @@ function StudentView() {
     // Create new utterance
     const utterance = new SpeechSynthesisUtterance(exercise.pergunta);
     utterance.lang = 'pt-BR';
-    utterance.rate = 0.9; // slightly slower for kids
-    utterance.pitch = 1.1; // slightly higher pitch
+    utterance.rate = 0.9; 
+    utterance.pitch = 1.1; 
 
     window.speechSynthesis.speak(utterance);
   };
@@ -70,17 +73,20 @@ function StudentView() {
         colors: ['#51CF66', '#FCC419', '#4ECDC4', '#FF6B6B']
       });
     } else {
-      // Small vibration maybe?
       if (navigator.vibrate) navigator.vibrate(200);
     }
 
     try {
-      await axios.post(`${API_URL}/answers`, {
-        exercicio_id: exercise._id,
-        resposta: selected,
-        correto: correct,
-        aluno_nome: alunoNome || 'Herói Misterioso'
-      });
+      const { error } = await supabase
+        .from('answers')
+        .insert([{
+          exercicio_id: exercise.id,
+          resposta: selected,
+          correto: correct,
+          aluno_nome: alunoNome || 'Herói Misterioso'
+        }]);
+      
+      if (error) throw error;
     } catch (err) {
       console.error('Error saving answer:', err);
     }

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { supabase } from '../lib/supabase';
+import { QRCodeSVG } from 'qrcode.react'; 
 import { Trash2, Link as LinkIcon, PlusCircle, LayoutDashboard } from 'lucide-react';
-
-const API_URL = '/api/exercises';
 
 function AdminDashboard() {
   const [exercises, setExercises] = useState([]);
@@ -20,15 +19,18 @@ function AdminDashboard() {
 
   const fetchExercises = async () => {
     try {
-      const res = await axios.get(API_URL);
-      if (Array.isArray(res.data)) {
-        setExercises(res.data);
-      } else {
-        console.warn('API did not return an array:', res.data);
-        setExercises([]);
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Supabase error:', error);
+        return;
       }
+      setExercises(data || []);
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching exercises:', err);
       setExercises([]);
     }
   };
@@ -42,7 +44,12 @@ function AdminDashboard() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(API_URL, formData);
+      const { error } = await supabase
+        .from('exercises')
+        .insert([formData]);
+      
+      if (error) throw error;
+
       setFormData({
         pergunta: '',
         alternativas: ['', '', '', ''],
@@ -52,16 +59,22 @@ function AdminDashboard() {
       });
       fetchExercises();
     } catch (err) {
-      console.error(err);
+      console.error('Error adding exercise:', err);
+      alert('Erro ao adicionar: Verifique se as tabelas foram criadas no Supabase.');
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API_URL}/${id}`);
+      const { error } = await supabase
+        .from('exercises')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
       fetchExercises();
     } catch (err) {
-      console.error(err);
+      console.error('Error deleting exercise:', err);
     }
   };
 
@@ -152,7 +165,7 @@ function AdminDashboard() {
         <div className="exercise-list">
           <h2 style={{ color: '#343a40' }}>Desafios Ativos ({exercises.length})</h2>
           {exercises.map(ex => (
-            <div key={ex._id} className="exercise-item">
+            <div key={ex.id} className="exercise-item">
               <div className="exercise-header">
                 <div>
                   <h3 style={{ fontSize: '1.4rem', color: '#1864ab', marginBottom: '0.5rem' }}>{ex.pergunta}</h3>
@@ -162,7 +175,7 @@ function AdminDashboard() {
                   </div>
                 </div>
                 <div className="exercise-actions">
-                  <button onClick={() => handleDelete(ex._id)} className="btn btn-danger" style={{ borderRadius: '8px' }}>
+                  <button onClick={() => handleDelete(ex.id)} className="btn btn-danger" style={{ borderRadius: '8px' }}>
                     <Trash2 size={20} />
                   </button>
                 </div>
@@ -170,8 +183,11 @@ function AdminDashboard() {
               
               <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
                 <div className="qr-container">
-                  <img src={ex.qr_code} alt="QR Code" />
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#868e96' }}>ID: {ex._id.substring(0,6)}...</div>
+                  <QRCodeSVG 
+                    value={`${window.location.protocol}//${window.location.host}/qr/${ex.id}`} 
+                    size={120} 
+                  />
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#868e96' }}>ID: {ex.id.substring(0,8)}...</div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <strong>Alternativas:</strong>
@@ -182,7 +198,7 @@ function AdminDashboard() {
                       </li>
                     ))}
                   </ul>
-                  <a href={`/qr/${ex._id}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', color: '#1c7ed6', textDecoration: 'none', fontWeight: 'bold' }}>
+                  <a href={`/qr/${ex.id}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', color: '#1c7ed6', textDecoration: 'none', fontWeight: 'bold' }}>
                     <LinkIcon size={16} /> Ver página do aluno
                   </a>
                 </div>
