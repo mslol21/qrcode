@@ -4,7 +4,7 @@ import axios from 'axios';
 import confetti from 'canvas-confetti';
 import { Volume2, Smile, Frown, Check, Send } from 'lucide-react';
 
-const API_URL = `${window.location.protocol}//${window.location.hostname}:5000/api`;
+const API_URL = '/api';
 
 function StudentView() {
   const { id } = useParams();

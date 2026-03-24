@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Trash2, Link as LinkIcon, PlusCircle, LayoutDashboard } from 'lucide-react';
 
-const API_URL = `${window.location.protocol}//${window.location.hostname}:5000/api/exercises`;
+const API_URL = '/api/exercises';
 
 function AdminDashboard() {
   const [exercises, setExercises] = useState([]);
