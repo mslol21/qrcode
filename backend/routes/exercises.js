@@ -53,9 +53,9 @@ router.post('/', async (req, res) => {
     const newExercise = await exercise.save();
     
     // Generate QR code for the specific exercise URL
-    // Assume frontend will run on port 5173 or similar, in prod we would use an environment var
-    const ip = getLocalIp();
-    const frontendUrl = process.env.FRONTEND_URL || `http://${ip}:5173`;
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const frontendUrl = process.env.FRONTEND_URL || `${protocol}://${host}`;
     const qrUrl = `${frontendUrl}/qr/${newExercise._id}`;
     
     const qrCodeDataUrl = await QRCode.toDataURL(qrUrl);

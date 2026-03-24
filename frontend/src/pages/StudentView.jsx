@@ -22,10 +22,14 @@ function StudentView() {
   const fetchExercise = async () => {
     try {
       const res = await axios.get(`${API_URL}/exercises/${id}`);
-      // Shuffle alternatives for fun
-      const ex = res.data;
-      ex.alternativas = [...ex.alternativas].sort(() => Math.random() - 0.5);
-      setExercise(ex);
+      if (res.data && res.data.alternativas) {
+        // Shuffle alternatives for fun
+        const ex = res.data;
+        ex.alternativas = [...ex.alternativas].sort(() => Math.random() - 0.5);
+        setExercise(ex);
+      } else {
+        console.warn('API returned invalid exercise data:', res.data);
+      }
     } catch (err) {
       console.error(err);
     }

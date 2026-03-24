@@ -21,9 +21,15 @@ function AdminDashboard() {
   const fetchExercises = async () => {
     try {
       const res = await axios.get(API_URL);
-      setExercises(res.data);
+      if (Array.isArray(res.data)) {
+        setExercises(res.data);
+      } else {
+        console.warn('API did not return an array:', res.data);
+        setExercises([]);
+      }
     } catch (err) {
       console.error(err);
+      setExercises([]);
     }
   };
 
