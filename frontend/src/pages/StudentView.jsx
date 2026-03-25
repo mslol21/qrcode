@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import confetti from 'canvas-confetti';
-import { Volume2, Smile, Frown, Check, Send } from 'lucide-react';
+import { Volume2, Smile, Frown, Check, Send, Users, Star } from 'lucide-react';
 
 function StudentView() {
   const { id } = useParams();
   const [exercise, setExercise] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [builtWord, setBuiltWord] = useState([]);
   const [submitted, setSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [alunoNome, setAlunoNome] = useState('');
+  const [grupo, setGrupo] = useState('');
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
@@ -28,9 +30,11 @@ function StudentView() {
       if (error) throw error;
 
       if (data && data.alternativas) {
-        // Shuffle alternatives for fun
+        // Only shuffle if it's multiple choice, keep others as specified
         const ex = data;
-        ex.alternativas = [...ex.alternativas].sort(() => Math.random() - 0.5);
+        if (ex.tipo === 'escolha') {
+          ex.alternativas = [...ex.alternativas].sort(() => Math.random() - 0.5);
+        }
         setExercise(ex);
       }
     } catch (err) {
@@ -40,16 +44,10 @@ function StudentView() {
 
   const handleListen = () => {
     if (!exercise) return;
-    
-    // Stop any ongoing speech
     window.speechSynthesis.cancel();
-    
-    // Create new utterance
     const utterance = new SpeechSynthesisUtterance(exercise.pergunta);
     utterance.lang = 'pt-BR';
     utterance.rate = 0.9; 
-    utterance.pitch = 1.1; 
-
     window.speechSynthesis.speak(utterance);
   };
 
@@ -58,10 +56,22 @@ function StudentView() {
     setSelected(alt);
   };
 
-  const handleSubmit = async () => {
-    if (!selected) return;
+  const handleAddSyllable = (syl) => {
+    if (submitted) return;
+    setBuiltWord([...builtWord, syl]);
+  };
 
-    const correct = selected === exercise.resposta_correta;
+  const handleSubmit = async () => {
+    let currentAnswer = selected;
+    
+    // For syllable building, join the pieces
+    if (exercise.tipo === 'silabas') {
+      currentAnswer = builtWord.join('');
+    }
+
+    if (!currentAnswer && exercise.tipo !== 'silabas') return;
+
+    const correct = currentAnswer?.toLowerCase() === exercise.resposta_correta?.toLowerCase();
     setIsCorrect(correct);
     setSubmitted(true);
 
@@ -72,8 +82,6 @@ function StudentView() {
         origin: { y: 0.6 },
         colors: ['#51CF66', '#FCC419', '#4ECDC4', '#FF6B6B']
       });
-    } else {
-      if (navigator.vibrate) navigator.vibrate(200);
     }
 
     try {
@@ -81,9 +89,10 @@ function StudentView() {
         .from('answers')
         .insert([{
           exercicio_id: exercise.id,
-          resposta: selected,
+          resposta: currentAnswer || '',
           correto: correct,
-          aluno_nome: alunoNome || 'Herói Misterioso'
+          aluno_nome: alunoNome || 'Herói Misterioso',
+          grupo: grupo || 'Nenhum'
         }]);
       
       if (error) throw error;
@@ -93,24 +102,54 @@ function StudentView() {
   };
 
   if (!exercise) {
-    return <div style={{ textAlign: 'center', marginTop: '5rem', fontSize: '2rem' }}>Carregando... 🚀</div>;
+    return <div style={{ textAlign: 'center', marginTop: '5rem', fontSize: '2rem' }}>Carregando Missão... 🚀</div>;
   }
 
   if (!started) {
     return (
       <div className="student-container">
-        <div className="card student-card" style={{ maxWidth: '400px' }}>
-          <Smile size={80} color="#FF6B6B" style={{ margin: '0 auto', marginBottom: '1rem', display: 'block' }} />
-          <h1 className="title">Quem é você?</h1>
-          <input
-            className="form-input"
-            style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: '1.5rem' }}
-            placeholder="Seu nome"
-            value={alunoNome}
-            onChange={(e) => setAlunoNome(e.target.value)}
-          />
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setStarted(true)}>
-            Começar! 🎮
+        <div className="card student-card" style={{ maxWidth: '400px', textAlign: 'center' }}>
+          <Star size={70} color="#FFD43B" fill="#FFD43B" style={{ margin: '0 auto', marginBottom: '1rem' }} />
+          <h1 className="title" style={{ fontSize: '1.8rem' }}>Partiu Gincana? 🏆</h1>
+          
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label className="form-label">Qual o seu grupo?</label>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+              <button 
+                className={`btn ${grupo === 'Grupo A' ? 'btn-primary' : 'btn-secondary'}`} 
+                style={{ flex: 1, padding: '1.5rem' }}
+                onClick={() => setGrupo('Grupo A')}
+              >
+                Grupo A 🦁
+              </button>
+              <button 
+                className={`btn ${grupo === 'Grupo B' ? 'btn-primary' : 'btn-secondary'}`} 
+                style={{ flex: 1, padding: '1.5rem', background: grupo === 'Grupo B' ? '#e03131' : '#f8f9fa' }}
+                onClick={() => setGrupo('Grupo B')}
+              >
+                Grupo B 🦅
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <label className="form-label">Qual seu nome?</label>
+            <input
+              className="form-input"
+              style={{ textAlign: 'center', fontSize: '1.2rem' }}
+              placeholder="Digite aqui..."
+              value={alunoNome}
+              onChange={(e) => setAlunoNome(e.target.value)}
+            />
+          </div>
+
+          <button 
+            className="btn btn-primary" 
+            style={{ width: '100%', padding: '1.5rem', fontSize: '1.5rem' }} 
+            onClick={() => setStarted(true)}
+            disabled={!grupo || !alunoNome}
+          >
+            Vamos lá! 🦁🔥
           </button>
         </div>
       </div>
@@ -119,24 +158,52 @@ function StudentView() {
 
   return (
     <div className="student-container">
-      <div className="card student-card">
-        
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-          <span className="pill" style={{ fontSize: '1.2rem', padding: '0.5rem 1rem' }}>{exercise.categoria}</span>
+      <div className="card student-card" style={{ position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '-15px', right: '20px', background: '#339af0', color: 'white', padding: '5px 15px', borderRadius: '15px', fontWeight: 'bold' }}>
+          {grupo} ⚔️
         </div>
 
-        <h1 className="question-text">{exercise.pergunta}</h1>
+        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+          <span className="pill" style={{ background: '#339af0', fontSize: '1.1rem', padding: '0.4rem 1.2rem' }}>{exercise.categoria}</span>
+        </div>
+
+        {exercise.image_url && (
+          <div className="exercise-media-container" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <img 
+              src={exercise.image_url} 
+              alt="Referência" 
+              style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '15px', border: '5px solid #f8f9fa' }} 
+            />
+          </div>
+        )}
+
+        <h1 className="question-text" style={{ fontSize: exercise.image_url ? '1.8rem' : '2.4rem' }}>
+          {exercise.tipo === 'completar' ? exercise.pergunta.replace('__', ' ___ ') : exercise.pergunta}
+        </h1>
         
-        <button className="listen-btn" onClick={handleListen} title="Ouvir Pergunta">
-          <Volume2 size={40} />
+        <button className="listen-btn" onClick={handleListen} style={{ width: '60px', height: '60px', margin: '0 auto 1.5rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Volume2 size={32} />
         </button>
 
-        <div className="options-grid">
+        {exercise.tipo === 'silabas' && (
+          <div className="display-built-word" style={{ fontSize: '2.5rem', minHeight: '60px', border: '4px dashed #dee2e6', borderRadius: '15px', padding: '1rem', marginBottom: '1.5rem', textAlign: 'center', fontWeight: 'bold', color: '#1c7ed6' }}>
+            {builtWord.join('-')}
+            {!submitted && builtWord.length > 0 && <span onClick={() => setBuiltWord(builtWord.slice(0, -1))} style={{ cursor: 'pointer', marginLeft: '10px', color: '#fa5252' }}>×</span>}
+          </div>
+        )}
+
+        <div className={exercise.tipo === 'silabas' ? "syllables-grid" : "options-grid"}>
           {exercise.alternativas.map((alt, i) => {
-            let className = "option-btn";
+            let className = exercise.tipo === 'silabas' ? "syllable-btn" : "option-btn";
+            
             if (submitted) {
-              if (alt === exercise.resposta_correta) className += " correct";
-              else if (alt === selected) className += " wrong";
+              if (exercise.tipo === 'silabas') {
+                // Syllables are harder to highlight correctness individually in a joined string
+                className += " disabled";
+              } else {
+                if (alt === exercise.resposta_correta) className += " correct";
+                else if (alt === selected) className += " wrong";
+              }
             } else if (alt === selected) {
               className += " selected";
             }
@@ -145,8 +212,9 @@ function StudentView() {
               <button
                 key={i}
                 className={className}
-                onClick={() => handleSelect(alt)}
+                onClick={() => exercise.tipo === 'silabas' ? handleAddSyllable(alt) : handleSelect(alt)}
                 disabled={submitted}
+                style={exercise.tipo === 'silabas' ? { fontSize: '1.5rem', padding: '1.2rem', background: '#f1f3f5', border: '2px solid #ced4da', borderRadius: '12px' } : {}}
               >
                 {alt}
               </button>
@@ -157,14 +225,13 @@ function StudentView() {
         {!submitted && (
           <button 
             className="btn btn-primary" 
-            style={{ width: '100%', fontSize: '1.8rem', padding: '1.2rem' }}
+            style={{ width: '100%', fontSize: '1.8rem', padding: '1.5rem', marginTop: '1.5rem' }}
             onClick={handleSubmit}
-            disabled={!selected}
+            disabled={exercise.tipo === 'silabas' ? builtWord.length === 0 : !selected}
           >
             <Send size={30} style={{ marginRight: '10px' }} /> RESPONDER
           </button>
         )}
-
       </div>
 
       {submitted && (
@@ -172,31 +239,33 @@ function StudentView() {
           <div className="feedback-card">
             {isCorrect ? (
               <>
-                <Smile size={100} color="#51CF66" style={{ margin: '0 auto' }} className="feedback-icon" />
-                <h1 className="feedback-title" style={{ color: '#2b8a3e' }}>Uau, PARABÉNS!</h1>
-                <p style={{ fontSize: '1.5rem', color: '#495057' }}>Você acertou! 🎉</p>
-                <p style={{ fontSize: '1.2rem', color: '#868e96', marginTop: '1rem' }}>Resposta: {exercise.resposta_correta}</p>
+                <Smile size={100} color="#51CF66" className="feedback-icon" />
+                <h1 className="feedback-title" style={{ color: '#2b8a3e' }}>TEMA GANHA PONTO! 🎉</h1>
+                <p style={{ fontSize: '1.5rem' }}>+1 para o {grupo}! Show de bola!</p>
+                <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', marginTop: '1rem' }}>
+                  {[1,2,3].map(s => <Star key={s} fill="#FCC419" color="#FCC419" size={30} strokeWidth={3} />)}
+                </div>
               </>
             ) : (
               <>
-                <Frown size={100} color="#FF6B6B" style={{ margin: '0 auto' }} className="feedback-icon" />
+                <Frown size={100} color="#FF6B6B" className="feedback-icon" />
                 <h1 className="feedback-title" style={{ color: '#e03131' }}>Quase lá!</h1>
-                <p style={{ fontSize: '1.5rem', color: '#495057' }}>A resposta certa era:</p>
-                <p style={{ fontSize: '2rem', color: '#51CF66', fontWeight: 'bold', margin: '1rem 0' }}>{exercise.resposta_correta}</p>
-                <p style={{ fontSize: '1.2rem', color: '#868e96' }}>Não desista, tente de novo numa próxima! 💪</p>
+                <p style={{ fontSize: '1.4rem' }}>A resposta era: <strong>{exercise.resposta_correta}</strong></p>
+                <p style={{ marginTop: '1rem', color: '#868e96' }}>Não desanime, {grupo}! Na próxima vocês arrasam! 💪</p>
               </>
             )}
             
-            <button 
-              className="btn btn-secondary" 
-              style={{ marginTop: '2rem', width: '100%', fontSize: '1.5rem' }}
-              onClick={() => window.location.reload()}
-            >
-              <Check size={24} style={{ marginRight: '10px' }} /> TENTAR OUTRA VEZ
+            <button className="btn btn-secondary" style={{ marginTop: '2rem', width: '100%', fontSize: '1.5rem' }} onClick={() => window.location.reload()}>
+              <Check size={24} style={{ marginRight: '10px' }} /> PRÓXIMO QR CODE
             </button>
           </div>
         </div>
       )}
+      
+      <style>{`
+        .syllables-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 1rem; }
+        .disabled { opacity: 0.6; cursor: not-allowed; }
+      `}</style>
     </div>
   );
 }
