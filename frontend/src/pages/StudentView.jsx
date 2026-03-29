@@ -16,8 +16,21 @@ function StudentView() {
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
+    const savedNome = localStorage.getItem('aluno_nome');
+    const savedGrupo = localStorage.getItem('aluno_grupo');
+    if (savedNome) setAlunoNome(savedNome);
+    if (savedGrupo) setGrupo(savedGrupo);
+    if (savedNome && savedGrupo) setStarted(true);
+    
     fetchExercise();
   }, [id]);
+
+  const handleStart = () => {
+    if (!alunoNome || !grupo) return;
+    localStorage.setItem('aluno_nome', alunoNome);
+    localStorage.setItem('aluno_grupo', grupo);
+    setStarted(true);
+  };
 
   const fetchExercise = async () => {
     try {
@@ -146,7 +159,7 @@ function StudentView() {
           <button 
             className="btn btn-primary" 
             style={{ width: '100%', padding: '1.5rem', fontSize: '1.5rem' }} 
-            onClick={() => setStarted(true)}
+            onClick={handleStart}
             disabled={!grupo || !alunoNome}
           >
             Vamos lá! 🦁🔥

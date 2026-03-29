@@ -274,7 +274,15 @@ function AdminDashboard() {
                 <div style={{ background: '#f8f9fa', padding: '10px', borderRadius: '10px' }}>
                   <QRCodeSVG value={`${window.location.protocol}//${window.location.host}/qr/${ex.id}`} size={80} />
                 </div>
-                {ex.image_url && <img src={ex.image_url} alt="Recurso" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />}
+                {ex.image_url && (
+                  ex.image_url.toLowerCase().endsWith('.pdf') || ex.tipo === 'pdf' ? (
+                    <div style={{ width: '60px', height: '60px', borderRadius: '8px', background: '#fff5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #ffc9c9' }}>
+                       <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#e03131' }}>PDF</span>
+                    </div>
+                  ) : (
+                    <img src={ex.image_url} alt="Recurso" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
+                  )
+                )}
                 <div style={{ flex: 1 }}>
                   <strong>Certa: {ex.resposta_correta}</strong>
                   <div style={{ fontSize: '0.8rem', color: '#868e96' }}>ID: {ex.id.substring(0,8)}...</div>
