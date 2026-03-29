@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import confetti from 'canvas-confetti';
-import { Volume2, Smile, Frown, Check, Send, Users, Star } from 'lucide-react';
+import { Volume2, Smile, Frown, Check, Send, Users, Star, FileText, ExternalLink } from 'lucide-react';
 
 function StudentView() {
   const { id } = useParams();
@@ -84,7 +84,7 @@ function StudentView() {
 
     if (!currentAnswer && exercise.tipo !== 'silabas') return;
 
-    const correct = currentAnswer?.toLowerCase() === exercise.resposta_correta?.toLowerCase();
+    const correct = exercise.tipo === 'pdf' ? (currentAnswer && currentAnswer.trim().length > 0) : (currentAnswer?.toLowerCase() === exercise.resposta_correta?.toLowerCase());
     setIsCorrect(correct);
     setSubmitted(true);
 
@@ -191,12 +191,38 @@ function StudentView() {
         )}
 
         {exercise.tipo === 'pdf' && (
-          <div className="pdf-container" style={{ textAlign: 'center', marginBottom: '1.5rem', height: '600px', borderRadius: '15px', overflow: 'hidden', border: '5px solid #f8f9fa' }}>
-            <iframe 
-              src={exercise.image_url} 
-              title={exercise.pergunta}
-              style={{ width: '100%', height: '100%', border: 'none' }}
-            />
+          <div className="pdf-container" style={{ textAlign: 'center', marginBottom: '1rem' }}>
+             <div style={{ background: '#f8f9fa', padding: '10px', borderRadius: '15px', border: '2px solid #dee2e6', marginBottom: '1rem' }}>
+                <p style={{ fontWeight: 'bold', color: '#1c7ed6', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <FileText size={20} /> Visualize a atividade abaixo:
+                </p>
+                <div style={{ position: 'relative', width: '100%', height: '400px', background: '#e9ecef', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <iframe 
+                    src={exercise.image_url} 
+                    title={exercise.pergunta}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: '10px', border: 'none', zIndex: 1 }}
+                  />
+                  <div style={{ padding: '20px', textAlign: 'center' }}>
+                    <p style={{ color: '#868e96', fontSize: '0.9rem' }}>Se o arquivo não carregar sozinho:</p>
+                    <a href={exercise.image_url} target="_blank" rel="noreferrer" className="btn" style={{ background: '#339af0', color: 'white', textDecoration: 'none', marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      <ExternalLink size={18} /> ABRIR PDF AGORA
+                    </a>
+                  </div>
+                </div>
+             </div>
+             
+             <div className="form-group" style={{ textAlign: 'left', marginTop: '1.5rem', background: '#e7f5ff', padding: '1.5rem', borderRadius: '15px', border: '2px solid #339af0' }}>
+                <label className="form-label" style={{ fontSize: '1.2rem', color: '#1864ab', fontWeight: 'bold', marginBottom: '10px', display: 'block' }}>✏️ ESCREVA SUA RESPOSTA AQUI:</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="O que você descobriu?"
+                  style={{ fontSize: '1.6rem', padding: '1.2rem', textAlign: 'center', border: '3px solid #339af0' }}
+                  value={selected || ''}
+                  onChange={(e) => setSelected(e.target.value)}
+                  disabled={submitted}
+                />
+             </div>
           </div>
         )}
 
@@ -253,9 +279,9 @@ function StudentView() {
             className="btn btn-primary" 
             style={{ width: '100%', fontSize: '1.8rem', padding: '1.5rem', marginTop: '1.5rem' }}
             onClick={handleSubmit}
-            disabled={exercise.tipo === 'pdf' ? false : (exercise.tipo === 'silabas' ? builtWord.length === 0 : !selected)}
+            disabled={exercise.tipo === 'silabas' ? builtWord.length === 0 : !selected}
           >
-            <Send size={30} style={{ marginRight: '10px' }} /> {exercise.tipo === 'pdf' ? 'FINALIZADO' : 'RESPONDER'}
+            <Send size={30} style={{ marginRight: '10px' }} /> RESPONDER E GANHAR PONTO
           </button>
         )}
       </div>
