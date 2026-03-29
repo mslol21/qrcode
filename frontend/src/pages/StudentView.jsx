@@ -167,7 +167,7 @@ function StudentView() {
           <span className="pill" style={{ background: '#339af0', fontSize: '1.1rem', padding: '0.4rem 1.2rem' }}>{exercise.categoria}</span>
         </div>
 
-        {exercise.image_url && (
+        {exercise.image_url && exercise.tipo !== 'pdf' && (
           <div className="exercise-media-container" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <img 
               src={exercise.image_url} 
@@ -177,13 +177,25 @@ function StudentView() {
           </div>
         )}
 
-        <h1 className="question-text" style={{ fontSize: exercise.image_url ? '1.8rem' : '2.4rem' }}>
+        {exercise.tipo === 'pdf' && (
+          <div className="pdf-container" style={{ textAlign: 'center', marginBottom: '1.5rem', height: '600px', borderRadius: '15px', overflow: 'hidden', border: '5px solid #f8f9fa' }}>
+            <iframe 
+              src={exercise.image_url} 
+              title={exercise.pergunta}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+            />
+          </div>
+        )}
+
+        <h1 className="question-text" style={{ fontSize: (exercise.image_url || exercise.tipo === 'pdf') ? '1.8rem' : '2.4rem' }}>
           {exercise.tipo === 'completar' ? exercise.pergunta.replace('__', ' ___ ') : exercise.pergunta}
         </h1>
         
-        <button className="listen-btn" onClick={handleListen} style={{ width: '60px', height: '60px', margin: '0 auto 1.5rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Volume2 size={32} />
-        </button>
+        {exercise.tipo !== 'pdf' && (
+          <button className="listen-btn" onClick={handleListen} style={{ width: '60px', height: '60px', margin: '0 auto 1.5rem auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Volume2 size={32} />
+          </button>
+        )}
 
         {exercise.tipo === 'silabas' && (
           <div className="display-built-word" style={{ fontSize: '2.5rem', minHeight: '60px', border: '4px dashed #dee2e6', borderRadius: '15px', padding: '1rem', marginBottom: '1.5rem', textAlign: 'center', fontWeight: 'bold', color: '#1c7ed6' }}>
@@ -192,44 +204,45 @@ function StudentView() {
           </div>
         )}
 
-        <div className={exercise.tipo === 'silabas' ? "syllables-grid" : "options-grid"}>
-          {exercise.alternativas.map((alt, i) => {
-            let className = exercise.tipo === 'silabas' ? "syllable-btn" : "option-btn";
-            
-            if (submitted) {
-              if (exercise.tipo === 'silabas') {
-                // Syllables are harder to highlight correctness individually in a joined string
-                className += " disabled";
-              } else {
-                if (alt === exercise.resposta_correta) className += " correct";
-                else if (alt === selected) className += " wrong";
+        {exercise.tipo !== 'pdf' && (
+          <div className={exercise.tipo === 'silabas' ? "syllables-grid" : "options-grid"}>
+            {exercise.alternativas.map((alt, i) => {
+              let className = exercise.tipo === 'silabas' ? "syllable-btn" : "option-btn";
+              
+              if (submitted) {
+                if (exercise.tipo === 'silabas') {
+                  className += " disabled";
+                } else {
+                  if (alt === exercise.resposta_correta) className += " correct";
+                  else if (alt === selected) className += " wrong";
+                }
+              } else if (alt === selected) {
+                className += " selected";
               }
-            } else if (alt === selected) {
-              className += " selected";
-            }
 
-            return (
-              <button
-                key={i}
-                className={className}
-                onClick={() => exercise.tipo === 'silabas' ? handleAddSyllable(alt) : handleSelect(alt)}
-                disabled={submitted}
-                style={exercise.tipo === 'silabas' ? { fontSize: '1.5rem', padding: '1.2rem', background: '#f1f3f5', border: '2px solid #ced4da', borderRadius: '12px' } : {}}
-              >
-                {alt}
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={i}
+                  className={className}
+                  onClick={() => exercise.tipo === 'silabas' ? handleAddSyllable(alt) : handleSelect(alt)}
+                  disabled={submitted}
+                  style={exercise.tipo === 'silabas' ? { fontSize: '1.5rem', padding: '1.2rem', background: '#f1f3f5', border: '2px solid #ced4da', borderRadius: '12px' } : {}}
+                >
+                  {alt}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {!submitted && (
           <button 
             className="btn btn-primary" 
             style={{ width: '100%', fontSize: '1.8rem', padding: '1.5rem', marginTop: '1.5rem' }}
             onClick={handleSubmit}
-            disabled={exercise.tipo === 'silabas' ? builtWord.length === 0 : !selected}
+            disabled={exercise.tipo === 'pdf' ? false : (exercise.tipo === 'silabas' ? builtWord.length === 0 : !selected)}
           >
-            <Send size={30} style={{ marginRight: '10px' }} /> RESPONDER
+            <Send size={30} style={{ marginRight: '10px' }} /> {exercise.tipo === 'pdf' ? 'FINALIZADO' : 'RESPONDER'}
           </button>
         )}
       </div>
@@ -237,11 +250,11 @@ function StudentView() {
       {submitted && (
         <div className="feedback-overlay">
           <div className="feedback-card">
-            {isCorrect ? (
+            {isCorrect || exercise.tipo === 'pdf' ? (
               <>
                 <Smile size={100} color="#51CF66" className="feedback-icon" />
-                <h1 className="feedback-title" style={{ color: '#2b8a3e' }}>TEMA GANHA PONTO! 🎉</h1>
-                <p style={{ fontSize: '1.5rem' }}>+1 para o {grupo}! Show de bola!</p>
+                <h1 className="feedback-title" style={{ color: '#2b8a3e' }}>{exercise.tipo === 'pdf' ? 'Bom estudo!' : 'TEMA GANHA PONTO!'} 🎉</h1>
+                <p style={{ fontSize: '1.5rem' }}>{exercise.tipo === 'pdf' ? 'Você completou a leitura!' : `+1 para o ${grupo}! Show de bola!`}</p>
                 <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', marginTop: '1rem' }}>
                   {[1,2,3].map(s => <Star key={s} fill="#FCC419" color="#FCC419" size={30} strokeWidth={3} />)}
                 </div>

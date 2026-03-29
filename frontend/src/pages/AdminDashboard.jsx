@@ -175,6 +175,7 @@ function AdminDashboard() {
                 <option value="escolha">Marcar Resposta</option>
                 <option value="completar">Completar Lacuna</option>
                 <option value="silabas">Montar com Sílabas</option>
+                <option value="pdf">Material (PDF)</option>
               </select>
             </div>
 
