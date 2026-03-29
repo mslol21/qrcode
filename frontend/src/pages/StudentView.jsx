@@ -68,10 +68,10 @@ function StudentView() {
       
       if (error) throw error;
 
-      if (data && data.alternativas) {
+      if (data) {
         // Only shuffle if it's multiple choice, keep others as specified
         const ex = data;
-        if (ex.tipo === 'escolha') {
+        if (ex.tipo === 'escolha' && ex.alternativas) {
           ex.alternativas = [...ex.alternativas].sort(() => Math.random() - 0.5);
         }
         setExercise(ex);
