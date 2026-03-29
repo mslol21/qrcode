@@ -13,9 +13,15 @@ function StudentView() {
   const [isCorrect, setIsCorrect] = useState(false);
   const [alunoNome, setAlunoNome] = useState('');
   const [grupo, setGrupo] = useState('');
+  const [groupNames, setGroupNames] = useState({
+    'Grupo A': 'Grupo A 🦁',
+    'Grupo B': 'Grupo B 🦅'
+  });
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
+    fetchGroupNames();
+    
     const savedNome = localStorage.getItem('aluno_nome');
     const savedGrupo = localStorage.getItem('aluno_grupo');
     if (savedNome) setAlunoNome(savedNome);
@@ -24,6 +30,26 @@ function StudentView() {
     
     fetchExercise();
   }, [id]);
+
+  const fetchGroupNames = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('categoria', '_config')
+        .eq('pergunta', 'GROUP_NAMES')
+        .single();
+      
+      if (data && data.alternativas) {
+        setGroupNames({
+          'Grupo A': data.alternativas[0],
+          'Grupo B': data.alternativas[1]
+        });
+      }
+    } catch (err) {
+      console.log('Using default group names');
+    }
+  };
 
   const handleStart = () => {
     if (!alunoNome || !grupo) return;
@@ -127,20 +153,20 @@ function StudentView() {
           
           <div style={{ marginBottom: '1.5rem' }}>
             <label className="form-label">Qual o seu grupo?</label>
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem' }}>
               <button 
                 className={`btn ${grupo === 'Grupo A' ? 'btn-primary' : 'btn-secondary'}`} 
-                style={{ flex: 1, padding: '1.5rem' }}
+                style={{ flex: 1, padding: '1.5rem', minWidth: '150px' }}
                 onClick={() => setGrupo('Grupo A')}
               >
-                Grupo A 🦁
+                {groupNames['Grupo A']}
               </button>
               <button 
                 className={`btn ${grupo === 'Grupo B' ? 'btn-primary' : 'btn-secondary'}`} 
-                style={{ flex: 1, padding: '1.5rem', background: grupo === 'Grupo B' ? '#e03131' : '#f8f9fa' }}
+                style={{ flex: 1, padding: '1.5rem', minWidth: '150px', background: grupo === 'Grupo B' ? '#e03131' : '#f8f9fa' }}
                 onClick={() => setGrupo('Grupo B')}
               >
-                Grupo B 🦅
+                {groupNames['Grupo B']}
               </button>
             </div>
           </div>
@@ -173,7 +199,7 @@ function StudentView() {
     <div className="student-container">
       <div className="card student-card" style={{ position: 'relative' }}>
         <div style={{ position: 'absolute', top: '-15px', right: '20px', background: '#339af0', color: 'white', padding: '5px 15px', borderRadius: '15px', fontWeight: 'bold' }}>
-          {grupo} ⚔️
+          {groupNames[grupo] || grupo} ⚔️
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '1rem' }}>

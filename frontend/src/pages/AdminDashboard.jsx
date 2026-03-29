@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { QRCodeSVG } from 'qrcode.react'; 
-import { Trash2, Link as LinkIcon, PlusCircle, LayoutDashboard, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
+import { Trash2, Link as LinkIcon, PlusCircle, LayoutDashboard, Image as ImageIcon, Upload, Loader2, Edit3, X } from 'lucide-react';
 
 function AdminDashboard() {
   const [exercises, setExercises] = useState([]);
   const [scoreboard, setScoreboard] = useState({ 'Grupo A': 0, 'Grupo B': 0 });
   const [isUploading, setIsUploading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [groupNames, setGroupNames] = useState({
+    'Grupo A': localStorage.getItem('group_A_name') || 'Grupo A 🦁',
+    'Grupo B': localStorage.getItem('group_B_name') || 'Grupo B 🦅'
+  });
+  
   const [formData, setFormData] = useState({
     pergunta: '',
     alternativas: ['', '', '', ''],
@@ -20,7 +27,89 @@ function AdminDashboard() {
   useEffect(() => {
     fetchExercises();
     fetchScoreboard();
+    fetchGroupNames();
   }, []);
+
+  const fetchGroupNames = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('categoria', '_config')
+        .eq('pergunta', 'GROUP_NAMES')
+        .single();
+      
+      if (data && data.alternativas) {
+        setGroupNames({
+          'Grupo A': data.alternativas[0],
+          'Grupo B': data.alternativas[1]
+        });
+      }
+    } catch (err) {
+      console.log('Group names not set in DB yet');
+    }
+  };
+
+  const updateGroupNames = async (group, name) => {
+    const newNames = { ...groupNames, [group]: name };
+    setGroupNames(newNames);
+    
+    // Sync with DB
+    try {
+      const { data: existing } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('categoria', '_config')
+        .eq('pergunta', 'GROUP_NAMES')
+        .single();
+
+      const payload = {
+        pergunta: 'GROUP_NAMES',
+        alternativas: [newNames['Grupo A'], newNames['Grupo B']],
+        resposta_correta: 'CONFIG',
+        categoria: '_config',
+        nivel: 'fácil',
+        tipo: 'config'
+      };
+
+      if (existing) {
+        await supabase.from('exercises').update(payload).eq('id', existing.id);
+      } else {
+        await supabase.from('exercises').insert([payload]);
+      }
+    } catch (err) {
+      console.error('Error syncing group names:', err);
+    }
+  };
+  
+  const handleEdit = (ex) => {
+    setIsEditing(true);
+    setEditingId(ex.id);
+    setFormData({
+      pergunta: ex.pergunta,
+      alternativas: ex.alternativas && ex.alternativas.length > 0 ? [...ex.alternativas, '', '', '', ''].slice(0, 4) : ['', '', '', ''],
+      resposta_correta: ex.resposta_correta,
+      categoria: ex.categoria,
+      nivel: ex.nivel,
+      tipo: ex.tipo,
+      image_url: ex.image_url || ''
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditingId(null);
+    setFormData({
+      pergunta: '',
+      alternativas: ['', '', '', ''],
+      resposta_correta: '',
+      categoria: '',
+      nivel: 'fácil',
+      tipo: 'escolha',
+      image_url: ''
+    });
+  };
 
   const fetchExercises = async () => {
     try {
@@ -30,7 +119,7 @@ function AdminDashboard() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setExercises(data || []);
+      setExercises((data || []).filter(ex => ex.categoria !== '_config'));
     } catch (err) {
       console.error('Error fetching exercises:', err);
     }
@@ -95,14 +184,27 @@ function AdminDashboard() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { error } = await supabase
-        .from('exercises')
-        .insert([{
-          ...formData,
-          alternativas: formData.alternativas.filter(a => a.trim() !== '')
-        }]);
-      
-      if (error) throw error;
+      if (isEditing) {
+        const { error } = await supabase
+          .from('exercises')
+          .update({
+            ...formData,
+            alternativas: formData.alternativas.filter(a => a.trim() !== '')
+          })
+          .eq('id', editingId);
+        
+        if (error) throw error;
+        alert('Desafio atualizado com sucesso! 💎');
+      } else {
+        const { error } = await supabase
+          .from('exercises')
+          .insert([{
+            ...formData,
+            alternativas: formData.alternativas.filter(a => a.trim() !== '')
+          }]);
+        
+        if (error) throw error;
+      }
 
       setFormData({
         pergunta: '',
@@ -113,9 +215,11 @@ function AdminDashboard() {
         tipo: 'escolha',
         image_url: ''
       });
+      setIsEditing(false);
+      setEditingId(null);
       fetchExercises();
     } catch (err) {
-      console.error('Error adding exercise:', err);
+      console.error('Error saving exercise:', err);
       alert('Erro ao salvar no banco!');
     }
   };
@@ -152,22 +256,44 @@ function AdminDashboard() {
           <LayoutDashboard size={40} /> Admin Gincana 🏆
         </h1>
         
-        <div className="placar-display" style={{ display: 'flex', gap: '2rem' }}>
-          <div className="placar-item">
-            <span style={{ color: '#1c7ed6' }}>Grupo A 🦁</span>
+        <div className="placar-display" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+          <div className="placar-item" style={{ flex: 1, minWidth: '150px' }}>
+            <input 
+              className="form-input" 
+              style={{ fontSize: '0.9rem', padding: '5px', marginBottom: '5px', fontWeight: 'bold' }} 
+              value={groupNames['Grupo A']} 
+              onChange={e => updateGroupNames('Grupo A', e.target.value)} 
+            />
             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#1c7ed6' }}>{scoreboard['Grupo A']}</div>
           </div>
-          <div className="placar-item">
-            <span style={{ color: '#e03131' }}>Grupo B 🦅</span>
+          <div className="placar-item" style={{ flex: 1, minWidth: '150px' }}>
+            <input 
+              className="form-input" 
+              style={{ fontSize: '0.9rem', padding: '5px', marginBottom: '5px', fontWeight: 'bold' }} 
+              value={groupNames['Grupo B']} 
+              onChange={e => updateGroupNames('Grupo B', e.target.value)} 
+            />
             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#e03131' }}>{scoreboard['Grupo B']}</div>
           </div>
-          <button onClick={resetScores} className="btn" style={{ background: '#f1f3f5', height: 'fit-content' }}>Destaque Zerar</button>
+          <button onClick={resetScores} className="btn" style={{ background: '#f1f3f5', height: 'fit-content' }}>Zerar Placar</button>
         </div>
       </div>
 
       <div className="admin-grid">
         <div className="card">
-          <h2 style={{ marginBottom: '1.5rem' }}>Novo Desafio</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ margin: 0 }}>{isEditing ? 'Editar Desafio' : 'Novo Desafio'}</h2>
+            {isEditing && (
+              <button 
+                onClick={cancelEditing} 
+                className="btn btn-secondary" 
+                style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                <X size={16} /> Cancelar
+              </button>
+            )}
+          </div>
+          
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label className="form-label">Tipo</label>
@@ -205,14 +331,16 @@ function AdminDashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <img src={formData.image_url} alt="Preview" style={{ maxWidth: '100px', borderRadius: '8px', marginBottom: '8px' }} />
                     <span style={{ fontSize: '0.8rem', color: '#2b8a3e' }}>Imagem carregada! ✅</span>
-                    <button type="button" onClick={() => setFormData({...formData, image_url: ''})} style={{ background: 'none', border: 'none', color: '#fa5252', textDecoration: 'underline', cursor: 'pointer', marginTop: '5px' }}>Remover</button>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                         <button type="button" onClick={() => setFormData({...formData, image_url: ''})} style={{ background: 'none', border: 'none', color: '#fa5252', textDecoration: 'underline', cursor: 'pointer', marginTop: '5px' }}>Remover</button>
+                    </div>
                   </div>
                 ) : (
                   <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                     <Upload size={30} color="#339af0" />
                     <span style={{ fontWeight: 'bold', color: '#339af0' }}>Clique para Carregar Foto</span>
-                    <span style={{ fontSize: '0.8rem', color: '#868e96' }}>Formatos: JPG, PNG, WEBP</span>
-                    <input type="file" style={{ display: 'none' }} onChange={handleFileUpload} accept="image/*" />
+                    <span style={{ fontSize: '0.8rem', color: '#868e96' }}>Formatos: JPG, PNG, WEBP, PDF</span>
+                    <input type="file" style={{ display: 'none' }} onChange={handleFileUpload} accept="image/*,application/pdf" />
                   </label>
                 )}
               </div>
@@ -253,7 +381,8 @@ function AdminDashboard() {
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} disabled={isUploading}>
-              <PlusCircle size={24} style={{ marginRight: '8px' }} /> Criar Atividade
+              {isEditing ? <Edit3 size={24} style={{ marginRight: '8px' }} /> : <PlusCircle size={24} style={{ marginRight: '8px' }} />}
+              {isEditing ? 'Atualizar Desafio' : 'Criar Atividade'}
             </button>
           </form>
         </div>
@@ -261,13 +390,16 @@ function AdminDashboard() {
         <div className="exercise-list">
           <h2 style={{ color: '#343a40' }}>Desafios na Sala</h2>
           {exercises.map(ex => (
-            <div key={ex.id} className="exercise-item">
+            <div key={ex.id} className={`exercise-item ${editingId === ex.id ? 'editing' : ''}`}>
               <div className="exercise-header">
                 <div>
                   <span className="pill" style={{ opacity: 0.7 }}>{ex.tipo}</span>
                   <h3 style={{ margin: '5px 0' }}>{ex.pergunta}</h3>
                 </div>
-                <button onClick={() => handleDelete(ex.id)} className="btn btn-danger" style={{ borderRadius: '8px' }}><Trash2 size={16} /></button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button onClick={() => handleEdit(ex)} className="btn" style={{ background: '#e7f5ff', color: '#1c7ed6', borderRadius: '8px', padding: '8px' }}><Edit3 size={16} /></button>
+                    <button onClick={() => handleDelete(ex.id)} className="btn btn-danger" style={{ borderRadius: '8px', padding: '8px' }}><Trash2 size={16} /></button>
+                </div>
               </div>
               
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1rem' }}>
@@ -298,6 +430,7 @@ function AdminDashboard() {
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .placar-display { background: white; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .exercise-item.editing { border: 2px solid #339af0; background: #f0f7ff; }
       `}</style>
     </div>
   );
