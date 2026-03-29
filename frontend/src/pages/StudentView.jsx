@@ -110,7 +110,8 @@ function StudentView() {
 
     if (!currentAnswer && exercise.tipo !== 'silabas') return;
 
-    const correct = exercise.tipo === 'pdf' ? (currentAnswer && currentAnswer.trim().length > 0) : (currentAnswer?.toLowerCase() === exercise.resposta_correta?.toLowerCase());
+    const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+    const correct = normalize(currentAnswer) === normalize(exercise.resposta_correta);
     setIsCorrect(correct);
     setSubmitted(true);
 

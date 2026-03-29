@@ -357,12 +357,22 @@ function AdminDashboard() {
 
             <div className="form-group">
               <label className="form-label">Resposta Certa</label>
-              <select required className="form-select" value={formData.resposta_correta} onChange={e => setFormData({...formData, resposta_correta: e.target.value})}>
-                <option value="" disabled>Selecione a certa</option>
-                {formData.alternativas.map((alt, i) => (
-                  <option key={i} value={alt} disabled={!alt}>{alt}</option>
-                ))}
-              </select>
+              {formData.tipo === 'escolha' ? (
+                <select required className="form-select" value={formData.resposta_correta} onChange={e => setFormData({...formData, resposta_correta: e.target.value})}>
+                  <option value="" disabled>Selecione a certa</option>
+                  {formData.alternativas.map((alt, i) => (
+                    <option key={i} value={alt} disabled={!alt}>{alt}</option>
+                  ))}
+                </select>
+              ) : (
+                <input 
+                  required 
+                  className="form-input" 
+                  value={formData.resposta_correta} 
+                  onChange={e => setFormData({...formData, resposta_correta: e.target.value})} 
+                  placeholder="Digite a palavra correta para validação" 
+                />
+              )}
             </div>
 
             <div className="form-group" style={{ display: 'flex', gap: '1rem' }}>
