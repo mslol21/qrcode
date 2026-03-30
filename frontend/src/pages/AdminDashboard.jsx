@@ -14,6 +14,13 @@ function AdminDashboard() {
     'Grupo B': localStorage.getItem('group_B_name') || 'Grupo B 🦅'
   });
   
+  const [groupStudents, setGroupStudents] = useState({
+    'Grupo A': [],
+    'Grupo B': []
+  });
+  
+  const [newStudent, setNewStudent] = useState({ name: '', group: 'Grupo A' });
+
   const [formData, setFormData] = useState({
     pergunta: '',
     alternativas: ['', '', '', ''],
@@ -28,6 +35,7 @@ function AdminDashboard() {
     fetchExercises();
     fetchScoreboard();
     fetchGroupNames();
+    fetchGroupStudents();
   }, []);
 
   const fetchGroupNames = async () => {
@@ -47,6 +55,26 @@ function AdminDashboard() {
       }
     } catch (err) {
       console.log('Group names not set in DB yet');
+    }
+  };
+
+  const fetchGroupStudents = async () => {
+    try {
+      const { data } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('categoria', '_config')
+        .eq('pergunta', 'GROUP_STUDENTS')
+        .single();
+      
+      if (data && data.alternativas) {
+        setGroupStudents({
+          'Grupo A': data.alternativas[0] || [],
+          'Grupo B': data.alternativas[1] || []
+        });
+      }
+    } catch (err) {
+      console.log('Students list not setup yet');
     }
   };
 
@@ -80,6 +108,49 @@ function AdminDashboard() {
     } catch (err) {
       console.error('Error syncing group names:', err);
     }
+  };
+
+  const updateGroupStudents = async (updatedList) => {
+    setGroupStudents(updatedList);
+    try {
+      const { data: existing } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('categoria', '_config')
+        .eq('pergunta', 'GROUP_STUDENTS')
+        .single();
+
+      const payload = {
+        pergunta: 'GROUP_STUDENTS',
+        alternativas: [updatedList['Grupo A'], updatedList['Grupo B']],
+        resposta_correta: 'CONFIG',
+        categoria: '_config',
+        nivel: 'fácil',
+        tipo: 'config'
+      };
+
+      if (existing) {
+        await supabase.from('exercises').update(payload).eq('id', existing.id);
+      } else {
+        await supabase.from('exercises').insert([payload]);
+      }
+    } catch (err) {
+      console.error('Error syncing students:', err);
+    }
+  };
+
+  const addStudentToList = () => {
+    if (!newStudent.name.trim()) return;
+    const updated = { ...groupStudents };
+    updated[newStudent.group] = [...updated[newStudent.group], newStudent.name.trim()];
+    updateGroupStudents(updated);
+    setNewStudent({ ...newStudent, name: '' });
+  };
+
+  const removeStudent = (group, index) => {
+    const updated = { ...groupStudents };
+    updated[group] = updated[group].filter((_, i) => i !== index);
+    updateGroupStudents(updated);
   };
   
   const handleEdit = (ex) => {
@@ -119,7 +190,7 @@ function AdminDashboard() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setExercises((data || []).filter(ex => ex.categoria !== '_config'));
+      setExercises((data || []).filter(ex => ex.categoria && ex.categoria !== '_config' && ex.tipo !== 'config'));
     } catch (err) {
       console.error('Error fetching exercises:', err);
     }
@@ -134,11 +205,13 @@ function AdminDashboard() {
       if (error) throw error;
       
       const scores = { 'Grupo A': 0, 'Grupo B': 0 };
-      data.forEach(ans => {
-        if (ans.correto && scores[ans.grupo] !== undefined) {
-          scores[ans.grupo]++;
-        }
-      });
+      if (data) {
+        data.forEach(ans => {
+          if (ans.correto && scores[ans.grupo] !== undefined) {
+            scores[ans.grupo]++;
+          }
+        });
+      }
       setScoreboard(scores);
     } catch (err) {
       console.error('Error fetching scoreboard:', err);
@@ -152,21 +225,27 @@ function AdminDashboard() {
     try {
       setIsUploading(true);
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `exercicios/${fileName}`;
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = fileName; // Upload direct to root to minimize folder issues
 
       const { error: uploadError } = await supabase.storage
         .from('imagens-gincana')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Supabase Upload Error:', uploadError);
+        throw uploadError;
+      }
 
       const { data } = supabase.storage
         .from('imagens-gincana')
         .getPublicUrl(filePath);
 
-      setFormData(prev => ({ ...prev, image_url: data.publicUrl }));
-      alert('Imagem carregada com sucesso! ⭐');
+      if (data && data.publicUrl) {
+         setFormData(prev => ({ ...prev, image_url: data.publicUrl }));
+         console.log('Public URL generated:', data.publicUrl);
+         alert('Imagem carregada com sucesso! ⭐');
+      }
     } catch (err) {
       console.error('Erro no upload:', err);
       alert('Erro ao subir imagem! Verifique se você criou o Bucket "imagens-gincana" como PÚBLICO no Supabase Storage.');
@@ -318,7 +397,7 @@ function AdminDashboard() {
                   borderRadius: '12px', 
                   padding: '1.5rem', 
                   textAlign: 'center',
-                  background: formData.image_url ? '#e7f5ff' : '#f8f9fa',
+                  background: (formData.image_url && typeof formData.image_url === 'string' && formData.image_url.startsWith('http')) ? '#e7f5ff' : '#f8f9fa',
                   position: 'relative'
                 }}
               >
@@ -327,9 +406,11 @@ function AdminDashboard() {
                     <Loader2 className="animate-spin" size={30} />
                     <span>Enviando para o Supabase...</span>
                   </div>
-                ) : formData.image_url ? (
+                ) : (formData.image_url && typeof formData.image_url === 'string' && formData.image_url.startsWith('http')) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <img src={formData.image_url} alt="Preview" style={{ maxWidth: '100px', borderRadius: '8px', marginBottom: '8px' }} />
+                    <img src={formData.image_url} alt="Preview" style={{ maxWidth: '100px', borderRadius: '8px', marginBottom: '8px', display: 'block' }} 
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
                     <span style={{ fontSize: '0.8rem', color: '#2b8a3e' }}>Imagem carregada! ✅</span>
                     <div style={{ display: 'flex', gap: '10px' }}>
                          <button type="button" onClick={() => setFormData({...formData, image_url: ''})} style={{ background: 'none', border: 'none', color: '#fa5252', textDecoration: 'underline', cursor: 'pointer', marginTop: '5px' }}>Remover</button>
@@ -358,10 +439,10 @@ function AdminDashboard() {
             <div className="form-group">
               <label className="form-label">Resposta Certa</label>
               {formData.tipo === 'escolha' ? (
-                <select required className="form-select" value={formData.resposta_correta} onChange={e => setFormData({...formData, resposta_correta: e.target.value})}>
+                <select required className="form-select" value={formData.resposta_correta || ""} onChange={e => setFormData({...formData, resposta_correta: e.target.value})}>
                   <option value="" disabled>Selecione a certa</option>
                   {formData.alternativas.map((alt, i) => (
-                    <option key={i} value={alt} disabled={!alt}>{alt}</option>
+                    alt && <option key={i} value={alt}>{alt}</option>
                   ))}
                 </select>
               ) : (
@@ -395,6 +476,53 @@ function AdminDashboard() {
               {isEditing ? 'Atualizar Desafio' : 'Criar Atividade'}
             </button>
           </form>
+
+          <hr style={{ margin: '2rem 0', opacity: 0.1 }} />
+
+          <div className="student-management">
+            <h3>Gerenciar Alunos 👥</h3>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
+              <input 
+                className="form-input" 
+                placeholder="Nome do Aluno..." 
+                value={newStudent.name} 
+                onChange={e => setNewStudent({...newStudent, name: e.target.value})}
+              />
+              <select 
+                className="form-select" 
+                style={{ width: '120px' }}
+                value={newStudent.group} 
+                onChange={e => setNewStudent({...newStudent, group: e.target.value})}
+              >
+                <option value="Grupo A">{groupNames['Grupo A']}</option>
+                <option value="Grupo B">{groupNames['Grupo B']}</option>
+              </select>
+              <button onClick={addStudentToList} className="btn btn-primary">+</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ background: '#f1f3f5', padding: '10px', borderRadius: '8px' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#1c7ed6' }}>{groupNames['Grupo A']}</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                  {groupStudents['Grupo A'].map((name, i) => (
+                    <span key={i} className="pill" style={{ background: 'white', border: '1px solid #dbeafe', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {name} <X size={12} style={{ cursor: 'pointer' }} onClick={() => removeStudent('Grupo A', i)} />
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ background: '#f1f3f5', padding: '10px', borderRadius: '8px' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#e03131' }}>{groupNames['Grupo B']}</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                  {groupStudents['Grupo B'].map((name, i) => (
+                    <span key={i} className="pill" style={{ background: 'white', border: '1px solid #ffe3e3', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {name} <X size={12} style={{ cursor: 'pointer' }} onClick={() => removeStudent('Grupo B', i)} />
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="exercise-list">
@@ -416,13 +544,15 @@ function AdminDashboard() {
                 <div style={{ background: '#f8f9fa', padding: '10px', borderRadius: '10px' }}>
                   <QRCodeSVG value={`${window.location.protocol}//${window.location.host}/qr/${ex.id}`} size={80} />
                 </div>
-                {ex.image_url && (
+                {ex.image_url && typeof ex.image_url === 'string' && ex.image_url.startsWith('http') && (
                   ex.image_url.toLowerCase().endsWith('.pdf') || ex.tipo === 'pdf' ? (
                     <div style={{ width: '60px', height: '60px', borderRadius: '8px', background: '#fff5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #ffc9c9' }}>
                        <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#e03131' }}>PDF</span>
                     </div>
                   ) : (
-                    <img src={ex.image_url} alt="Recurso" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
+                    <img src={ex.image_url} alt="Recurso" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} 
+                       onError={(e) => { e.target.style.display = 'none'; }}
+                    />
                   )
                 )}
                 <div style={{ flex: 1 }}>

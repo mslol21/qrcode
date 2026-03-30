@@ -17,10 +17,16 @@ function StudentView() {
     'Grupo A': 'Grupo A 🦁',
     'Grupo B': 'Grupo B 🦅'
   });
+  const [groupStudents, setGroupStudents] = useState({
+    'Grupo A': [],
+    'Grupo B': []
+  });
   const [started, setStarted] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
     fetchGroupNames();
+    fetchGroupStudents();
     
     const savedNome = localStorage.getItem('aluno_nome');
     const savedGrupo = localStorage.getItem('aluno_grupo');
@@ -30,6 +36,26 @@ function StudentView() {
     
     fetchExercise();
   }, [id]);
+
+  const fetchGroupStudents = async () => {
+    try {
+      const { data } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('categoria', '_config')
+        .eq('pergunta', 'GROUP_STUDENTS')
+        .single();
+      
+      if (data && data.alternativas) {
+        setGroupStudents({
+          'Grupo A': data.alternativas[0] || [],
+          'Grupo B': data.alternativas[1] || []
+        });
+      }
+    } catch (err) {
+      console.log('Using default students');
+    }
+  };
 
   const fetchGroupNames = async () => {
     try {
@@ -174,13 +200,27 @@ function StudentView() {
 
           <div style={{ marginBottom: '2rem' }}>
             <label className="form-label">Qual seu nome?</label>
-            <input
-              className="form-input"
-              style={{ textAlign: 'center', fontSize: '1.2rem' }}
-              placeholder="Digite aqui..."
-              value={alunoNome}
-              onChange={(e) => setAlunoNome(e.target.value)}
-            />
+            {groupStudents[grupo] && groupStudents[grupo].length > 0 ? (
+              <select 
+                className="form-select"
+                style={{ textAlign: 'center', fontSize: '1.2rem', padding: '1rem' }}
+                value={alunoNome}
+                onChange={(e) => setAlunoNome(e.target.value)}
+              >
+                <option value="">Selecione seu nome...</option>
+                {groupStudents[grupo].map((name, i) => (
+                  <option key={i} value={name}>{name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="form-input"
+                style={{ textAlign: 'center', fontSize: '1.2rem' }}
+                placeholder="Digite aqui..."
+                value={alunoNome}
+                onChange={(e) => setAlunoNome(e.target.value)}
+              />
+            )}
           </div>
 
           <button 
@@ -207,12 +247,14 @@ function StudentView() {
           <span className="pill" style={{ background: '#339af0', fontSize: '1.1rem', padding: '0.4rem 1.2rem' }}>{exercise.categoria}</span>
         </div>
 
-        {exercise.image_url && exercise.tipo !== 'pdf' && (
-          <div className="exercise-media-container" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+        {exercise.image_url && typeof exercise.image_url === 'string' && exercise.image_url.startsWith('http') && exercise.tipo !== 'pdf' && (
+          <div className="exercise-media-container" style={{ textAlign: 'center', marginBottom: '1.5rem', display: imageLoaded ? 'block' : 'none' }}>
             <img 
               src={exercise.image_url} 
               alt="Referência" 
               style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '15px', border: '5px solid #f8f9fa' }} 
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(false)}
             />
           </div>
         )}
